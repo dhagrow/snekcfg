@@ -1,34 +1,13 @@
 """
-`snekcfg` is a light wrapper over `configparser` that offers a more
-streamlined user experience. Expected options and their types are predefined
-to prevent errors and minimize repetative logic within your codebase. This
-allows for simple, direct access to your configuration within your program
-without worrying about typos or type conversion.
-
-Example::
-
-    >>> cfg = snekcfg.Config('<filepath>')
-    >>> sct = cfg.section('server')
-    >>> sct.init('host', default='127.0.0.1')
-    >>> sct.init('port', default=1337) # automatically typed as an int
-    >>> cfg.init('whitelist.users', ['john', 'eric'], type=list[str])
-    >>> cfg.write()
-    >>> with open('<filepath>') as f:
-    ...     print(f.read())
-    [server]
-    host = 127.0.0.1
-    port = 1337
-
-    [whitelist]
-    users = john,eric
-    >>> cfg.read()
-    >>> cfg['server.port']
-    1337 # int
-    >>> cfg.section('whitelist')['users']
-    ['john', 'eric']
+snekcfg - incantations required to charm
 """
+
 import collections
 import configparser
+
+__author__  = 'Miguel Turner'
+__version__ = '0.1.0'
+__license__ = 'MIT'
 
 # rename the original so we can use the name
 _type = type
@@ -38,21 +17,28 @@ ConfigType = collections.namedtuple('ConfigType', 'encode, decode')
 
 class Config:
     """The main configuration object."""
-    def __init__(self, *sources):
+
+    def __init__(self, *sources, parser=None, strict=True):
         """Creates a `Config` object.
 
         *sources* can be any number of paths or file objects. When calling
         `Config.read` each of these will be read from sequentially. When calling
         `Config.write`, only the first source will be written to.
+
+        *parser* can be used to pass in a custom `configparser.ConfigParser`
+        instance. The default instance disables interpolation.
+
+        When *strict* is `True` (default), an exception is raised when setting
+        values for options that were not initialized using `Config.init`.
         """
         self._sources = sources
-        self._parser = configparser.ConfigParser(interpolation=None)
+        self._parser = parser or configparser.ConfigParser(interpolation=None)
         self._items = {}
         self._types = {}
 
         self._register_default_types()
 
-    def init(self, key, default, typename):
+    def init(self, key, default, typename=None):
         self._items[key] = ConfigItem(default, typename or _type(default))
 
         section_name, value_name = self._split_key(key)
@@ -178,7 +164,7 @@ class Config:
 
         self.register_type('list[str]',
             lambda v: ','.join(v),
-            lambda v: tuple(x.strip() for x in v.split(',')))
+            lambda v: list(x.strip() for x in v.split(',')))
 
         self.register_type('tuple[str, ...]',
             lambda v: ','.join(v),
