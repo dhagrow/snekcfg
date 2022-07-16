@@ -13,7 +13,7 @@ README_PATH = os.path.join(BASE_DIR, 'README.md')
 DESCRIPTION = open(README_PATH).read()
 
 setup(
-    name='profig',
+    name='snekcfg',
     version=snekcfg.__version__,
     description='A configuration library.',
     long_description=DESCRIPTION,

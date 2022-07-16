@@ -162,13 +162,16 @@ class Config:
             lambda x: 'true' if x else 'false',
             lambda x: _boolean_states[x.lower()])
 
+        self.register_type('set[str]',
+            lambda v: ','.join(v),
+            lambda v: set(x.strip() for x in v.split(',')))
         self.register_type('list[str]',
             lambda v: ','.join(v),
             lambda v: list(x.strip() for x in v.split(',')))
-
         self.register_type('tuple[str, ...]',
             lambda v: ','.join(v),
             lambda v: tuple(x.strip() for x in v.split(',')))
+
         self.register_type('tuple[int, ...]',
             lambda v: ','.join(str(x) for x in v),
             lambda v: tuple(int(x.strip()) for x in v.split(',')))
