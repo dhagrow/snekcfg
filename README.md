@@ -21,12 +21,12 @@ sct.init('host', default='127.0.0.1', type=str)
 
 # some common types like set[str] are already built-in,
 # but here as an example of adding codecs for a new type
-users = {'graham', 'john', 'terryg', 'eric', 'terryj', 'michael'}
 cfg.register_type(set[str],
     encode=lambda v: ','.join(v),
     decode=lambda v: set(x.strip() for x in v.split(',')))
 
 # *type* can be a type object, or just a string like 'str_set'
+users = {'graham', 'john', 'terryg', 'eric', 'terryj', 'michael'}
 cfg.init('whitelist.users', default=users, type=set[str])
 
 # writes to 'snek.cfg'
