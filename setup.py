@@ -15,7 +15,7 @@ DESCRIPTION = open(README_PATH).read()
 setup(
     name='snekcfg',
     version=snekcfg.__version__,
-    description='A configuration library.',
+    description='A minimalist wrapper for configparser.',
     long_description=DESCRIPTION,
     author=snekcfg.__author__,
     author_email='cymrow@gmail.com',
