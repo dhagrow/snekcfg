@@ -16,28 +16,20 @@ cfg = snekcfg.Config('example.cfg')
 
 sct = cfg.section('server')
 # the default value is used to automatically type as an int
-sct.init('port', 8080)
+sct.define('port', 8080)
 # or, you can be explicit
-sct.init('host', default='127.0.0.1', type=str)
-
-print(cfg)
-print(sct)
+sct.define('host', default='127.0.0.1', type=str)
 
 # some common types like set[str] are already built-in,
 # but here is an example of adding codecs for a new type
 # *type* can be a type object, or just a string like 'str_set'
-def decode(v):
-    x = set((x.strip() for x in v.split(',')) if v else set())
-    print((v, x))
-    return x
 cfg.register_type(
     type=set[str],
     encode=lambda v: ','.join(v),
-    decode=decode)
-
+    decode=lambda v: set(v.split(',')))
 
 # sections can be accessed using dot notation (one level deep)
-cfg.init('users.whitelist', default=set(), type=set[str])
+cfg.define('users.whitelist', default=set(), type=set[str])
 
 # update values with dot notation
 users = {'graham', 'john', 'terryg', 'eric', 'terryj', 'michael'}
@@ -48,18 +40,18 @@ cfg.section('server')['port'] = 1337
 # write to 'example.cfg'
 cfg.write()
 
-# clear changes, reset defaults
-cfg.clear()
-
-assert cfg['server.port'] == 8080
-assert cfg['users.whitelist'] == set()
+# let's tweak the config file externally
+with open('example.cfg', 'r+') as f:
+    s = f.read()
+    f.seek(0)
+    f.write(s.replace('1337', '1234'))
 
 # read from 'example.cfg'
 cfg.read()
 
 # types are preserved
-assert cfg['server.port'] == 1337
-assert cfg['users.whitelist'] == users, cfg['users.whitelist']
+assert cfg['server.port'] == 1234
+assert cfg['users.whitelist'] == users, users
 ```
 
 ## example.cfg
