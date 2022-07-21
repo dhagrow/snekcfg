@@ -243,7 +243,11 @@ class INIFormat(Format):
         for section, options in parser.items():
             sct = config.section(section)
             for name, value in options.items():
-                sct.set(name, value, decode=True)
+                try:
+                    sct.set(name, value, decode=True)
+                except UnknownOption:
+                    log.warning('unknown option: %s', name)
+                    continue
 
         self._clear()
 
