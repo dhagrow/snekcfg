@@ -3,7 +3,7 @@
 a more streamlined user experience.
 
 Expected options and their types are predefined to prevent errors and minimize
-repetative logic within your codebase. This allows for simple, direct access to
+repetitive logic within your codebase. This allows for simple, direct access to
 your configuration within your program without worrying about typos or type
 conversion.
 
@@ -21,7 +21,7 @@ sct.define('port', 8080)
 sct.define('host', default='127.0.0.1', type=str)
 
 # some common types like set[str] are already built-in,
-# but here is an example of adding codecs for a new type
+# but here is an example of adding a codec for a new type.
 # *type* can be a type object, or just a string like 'str_set'
 cfg.register_type(
     type=set[str],

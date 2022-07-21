@@ -15,9 +15,9 @@ __license__ = 'MIT'
 # rename the original so we can use the name
 _type = type
 
-Definition = collections.namedtuple('Definition', 'default type')
-CodecType = collections.namedtuple('CodecType', 'encode decode')
-CodecNop = CodecType(lambda v: v, lambda v: v)
+_Definition = collections.namedtuple('Definition', 'default type')
+_CodecType = collections.namedtuple('CodecType', 'encode decode')
+_CodecNop = _CodecType(lambda v: v, lambda v: v)
 
 log = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ class Section(collections.abc.MutableMapping):
 
     def define(self, name, default, type=None):
         type = self._config._codec.typename(type or _type(default))
-        self._schema[name] = Definition(default, type)
+        self._schema[name] = _Definition(default, type)
         self._values[name] = default
 
         self._set_section()
@@ -200,11 +200,11 @@ class Section(collections.abc.MutableMapping):
         self._config._sections[self.name] = self
 
     def _encode(self, name, value):
-        type = self._schema.get(name, Definition(None, None)).type
+        type = self._schema.get(name, _Definition(None, None)).type
         return self._config._codec.encode(value, type)
 
     def _decode(self, name, value):
-        type = self._schema.get(name, Definition(None, None)).type
+        type = self._schema.get(name, _Definition(None, None)).type
         return self._config._codec.decode(value, type)
 
     def _strict_check(self, name):
@@ -275,11 +275,11 @@ class Codec:
 
     def encode(self, value, type):
         type = self.typename(type)
-        return self._types.get(type, CodecNop).encode(value)
+        return self._types.get(type, _CodecNop).encode(value)
 
     def decode(self, value, type):
         type = self.typename(type)
-        return self._types.get(type, CodecNop).decode(value)
+        return self._types.get(type, _CodecNop).decode(value)
 
     def register_default_types(self):
         pass
@@ -291,7 +291,7 @@ class Codec:
 
     def register_type(self, type, encode, decode):
         typename = self.typename(type)
-        self._types[typename] = CodecType(
+        self._types[typename] = _CodecType(
             encode or (lambda v: v),
             decode or (lambda v: v),
             )
