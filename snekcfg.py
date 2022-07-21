@@ -4,6 +4,7 @@
 Snek-charming incantations follow ...
 """
 
+import logging
 import collections
 import configparser
 
@@ -17,6 +18,8 @@ _type = type
 Definition = collections.namedtuple('Definition', 'default type')
 CodecType = collections.namedtuple('CodecType', 'encode decode')
 CodecNop = CodecType(lambda v: v, lambda v: v)
+
+log = logging.getLogger(__name__)
 
 class Config:
     """The main configuration object."""
@@ -36,6 +39,7 @@ class Config:
 
         When *strict* is `True` (default), an exception is raised when setting
         values for options that were not initialized using `Config.init`.
+        Otherwise, a warning is logged.
 
         The *delimiter* is used to separate section names from option names.
         """
@@ -204,8 +208,12 @@ class Section(collections.abc.MutableMapping):
         return self._config._codec.decode(value, type)
 
     def _strict_check(self, name):
-        if self._config._strict and name not in self._schema:
+        if name in self._schema:
+            return
+        elif self._config._strict:
             raise UnknownOption(name)
+        else:
+            log.warning('unknown option: %s', name)
 
 ##
 ## formats
