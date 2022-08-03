@@ -124,11 +124,14 @@ class Config:
 
     def read(self, *sources):
         for source in sources or self._sources:
-            if isinstance(source, str):
-                with open(source, 'r') as f:
-                    self._format.read(f, self)
-            else:
-                self._format.read(source, self)
+            try:
+                if isinstance(source, str):
+                    with open(source, 'r') as f:
+                        self._format.read(f, self)
+                else:
+                    self._format.read(source, self)
+            except OSError as e:
+                log.warning('failed to open source: %s:\n  %s', source, e)
 
     def write(self, source=None):
         source = source or self._sources[0]
