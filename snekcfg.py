@@ -52,25 +52,42 @@ class Config:
         self._sections = {}
 
     def define(self, key, default, type=None):
+        """Defines a new option.
+
+        If *type* is not provided, it will be set to the type of the default
+        value.
+        """
         section, option = self._split_key(key)
         self.section(section).define(option, default, type)
 
     def get(self, key, default=None):
+        """Returns the value of the option at *key*.
+
+        If the option has not been
+        defined, returns the *default* value.
+        """
         try:
             return self[key]
         except KeyError:
             return default
 
     def section(self, section):
+        """Returns the `Section` object for *section*."""
         return self._sections.get(section, Section(section, self))
 
     def sections(self):
-        return list(self._sections.values())
+        """Yields all `Section` objects."""
+        yield from self._sections.values()
 
     def clear(self):
+        """Deletes all `Section` objects and their options."""
         self._sections.clear()
 
     def todict(self, encode=False):
+        """Returns a dict of `{'section_name': {'option': <value>}}`.
+
+        If *encode* is `True`, the *value* will be a string.
+        """
         return {sct.name: dict(sct.items(encode)) for sct in self}
 
     ## special methods ##
