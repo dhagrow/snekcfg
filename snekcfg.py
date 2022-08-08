@@ -178,6 +178,10 @@ class Section(collections.abc.MutableMapping):
 
         self._set_section()
 
+    def getdefault(self, name):
+        """Returns the default value for *name*."""
+        return self._schema[name].default
+
     def items(self, encode=False):
         items = super().items()
         if not encode:
