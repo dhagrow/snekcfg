@@ -17,6 +17,7 @@ setup(
     version=snekcfg.__version__,
     description='A minimalist wrapper for configparser.',
     long_description=DESCRIPTION,
+    long_description_content_type='text/markdown',
     author=snekcfg.__author__,
     author_email='cymrow@gmail.com',
     url='https://github.com/dhagrow/snekcfg',
