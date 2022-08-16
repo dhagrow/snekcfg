@@ -39,15 +39,17 @@ class Config:
 
         When *strict* is `True` (default), an exception is raised when setting
         values for options that were not initialized using `Config.init`.
-        Otherwise, a warning is logged.
+        Otherwise, a warning is logged. This option can be overridden by
+        individual sections.
 
         The *delimiter* is used to separate section names from option names.
         """
         self._sources = sources
         self._format = format or INIFormat()
         self._codec = codec or StringCodec()
-        self._strict = strict
         self._delimiter = delimiter
+
+        self.strict = strict
 
         self._sections = {}
 
@@ -71,9 +73,14 @@ class Config:
         except KeyError:
             return default
 
-    def section(self, section):
-        """Returns the `Section` object for *section*."""
-        return self._sections.get(section, Section(section, self))
+    def section(self, section, strict=None):
+        """Returns the `Section` object for *section*.
+
+        *strict* can be used to override the *strict* setting for this section.
+        """
+        sct = self._sections.get(section, Section(section, self))
+        sct.strict = strict
+        return sct
 
     def sections(self):
         """Yields all `Section` objects."""
@@ -149,12 +156,21 @@ class Section(collections.abc.MutableMapping):
         self._name = name
         self._config = config
 
+        self._strict = None
         self._schema = {}
         self._values = {}
 
     @property
     def name(self):
         return self._name
+
+    @property
+    def strict(self):
+        return self._config.strict if self._strict is None else self._strict
+
+    @strict.setter
+    def strict(self, strict):
+        self._strict = strict
 
     def define(self, name, default, type=None):
         type = self._config._codec.typename(type or _type(default))
@@ -234,7 +250,7 @@ class Section(collections.abc.MutableMapping):
     def _strict_check(self, name):
         if name in self._schema:
             return
-        elif self._config._strict:
+        elif self.strict:
             raise UnknownOption(name)
         else:
             log.warning('unknown option: %s', name)
