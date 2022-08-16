@@ -73,18 +73,16 @@ class Config:
         except KeyError:
             return default
 
-    def section(self, section, strict=None):
-        """Returns the `Section` object for *section*.
+    def section(self, name, strict=None):
+        """Returns the `Section` object for *name*.
 
         *strict* can be used to override the *strict* setting for this section.
         """
-        sct = self._sections.get(section, Section(section, self))
-        sct.strict = strict
-        return sct
+        return self._sections.setdefault(name, Section(self, name, strict))
 
     def sections(self):
-        """Yields all `Section` objects."""
-        yield from self._sections.values()
+        """Returns all `Section` objects."""
+        return self._sections.values()
 
     def clear(self):
         """Deletes all `Section` objects and their options."""
@@ -152,11 +150,11 @@ class Config:
         return key.split(self._delimiter, 1)
 
 class Section(collections.abc.MutableMapping):
-    def __init__(self, name, config):
-        self._name = name
+    def __init__(self, config, name, strict=None):
         self._config = config
+        self._name = name
 
-        self._strict = None
+        self._strict = strict
         self._schema = {}
         self._values = {}
 
@@ -177,8 +175,6 @@ class Section(collections.abc.MutableMapping):
         self._schema[name] = _Definition(default, type)
         self._values[name] = default
 
-        self._set_section()
-
     def get(self, name, default=None, encode=False):
         self._strict_check(name)
         value = self._values.get(name, default)
@@ -191,8 +187,6 @@ class Section(collections.abc.MutableMapping):
         if decode:
             value = self._decode(name, value)
         self._values[name] = value
-
-        self._set_section()
 
     def getdefault(self, name):
         """Returns the default value for *name*."""
@@ -218,8 +212,6 @@ class Section(collections.abc.MutableMapping):
         self._strict_check(name)
         self._values[name] = value
 
-        self._set_section()
-
     def __delitem__(self, name):
         self._strict_check(name)
         del self._schema[name]
@@ -236,9 +228,6 @@ class Section(collections.abc.MutableMapping):
 
     ## internal ##
 
-    def _set_section(self):
-        self._config._sections[self.name] = self
-
     def _encode(self, name, value):
         type = self._schema.get(name, _Definition(None, None)).type
         return self._config._codec.encode(value, type)
@@ -248,12 +237,8 @@ class Section(collections.abc.MutableMapping):
         return self._config._codec.decode(value, type)
 
     def _strict_check(self, name):
-        if name in self._schema:
-            return
-        elif self.strict:
+        if self.strict and name not in self._schema:
             raise UnknownOption(name)
-        else:
-            log.warning('unknown option: %s', name)
 
 ##
 ## formats
@@ -281,6 +266,9 @@ class INIFormat(Format):
         parser.read_file(file)
 
         for section, options in parser.items():
+            if not options:
+                continue
+
             sct = config.section(section)
             for name, value in options.items():
                 try:
