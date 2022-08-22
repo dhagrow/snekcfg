@@ -9,7 +9,7 @@ import collections
 import configparser
 
 __author__  = 'Miguel Turner'
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 __license__ = 'MIT'
 
 # rename the original so we can use the name
