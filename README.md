@@ -51,7 +51,7 @@ cfg.read()
 
 # types are preserved
 assert cfg['server.port'] == 1234
-assert cfg['users.whitelist'] == users, users
+assert cfg['users.whitelist'] == users
 ```
 
 ## example.cfg
