@@ -15,10 +15,6 @@ __license__ = 'MIT'
 # rename the original so we can use the name
 _type = type
 
-_Definition = collections.namedtuple('Definition', 'default type')
-_CodecType = collections.namedtuple('CodecType', 'encode decode')
-_CodecNop = _CodecType(lambda v: v, lambda v: v)
-
 log = logging.getLogger(__name__)
 
 class Config:
@@ -373,3 +369,11 @@ class ConfigError(Exception):
 
 class UnknownOption(ConfigError):
     pass
+
+##
+## internal
+##
+
+_Definition = collections.namedtuple('_Definition', 'default type')
+_CodecType = collections.namedtuple('_CodecType', 'encode decode')
+_CodecNop = _CodecType(lambda v: v, lambda v: v)
