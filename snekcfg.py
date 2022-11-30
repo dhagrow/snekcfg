@@ -61,7 +61,10 @@ class Config:
         If *type* is not provided, it will be set to the type of the default
         value.
         """
-        section, option = self._split_key(key)
+        try:
+            section, option = self._split_key(key)
+        except ValueError:
+            raise InvalidKey('key name must include section name')
         self.section(section).define(option, default, type)
 
     def get(self, key: str, default: Any=None) -> Any:
@@ -379,6 +382,9 @@ class ConfigError(Exception):
     pass
 
 class UnknownOption(ConfigError):
+    pass
+
+class InvalidKey(ConfigError):
     pass
 
 ##
