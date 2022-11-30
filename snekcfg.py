@@ -4,9 +4,13 @@
 Snek-charming incantations follow ...
 """
 
+from __future__ import annotations
+
 import logging
 import collections
-import configparser
+from configparser import ConfigParser
+
+from typing import Any, Callable, Generator, NamedTuple, TextIO, ValuesView
 
 __author__  = 'Miguel Turner'
 __version__ = '0.1.1'
@@ -20,7 +24,9 @@ log = logging.getLogger(__name__)
 class Config:
     """The main configuration object."""
 
-    def __init__(self, *sources, format=None, codec=None, strict=True, delimiter='.'):
+    def __init__(self, *sources: str | TextIO, format: Format | None=None,
+        codec: Codec | None=None, strict: bool=True, delimiter: str='.'
+        ):
         """Creates a `Config` object.
 
         *sources* can be any number of paths or file objects. When calling
@@ -47,9 +53,9 @@ class Config:
 
         self.strict = strict
 
-        self._sections = {}
+        self._sections: dict[str, Section] = {}
 
-    def define(self, key, default, type=None):
+    def define(self, key: str, default: Any, type: Any=None) -> None:
         """Defines a new option.
 
         If *type* is not provided, it will be set to the type of the default
@@ -58,7 +64,7 @@ class Config:
         section, option = self._split_key(key)
         self.section(section).define(option, default, type)
 
-    def get(self, key, default=None):
+    def get(self, key: str, default: Any=None) -> Any:
         """Returns the value of the option at *key*.
 
         If the option has not been
@@ -69,61 +75,64 @@ class Config:
         except KeyError:
             return default
 
-    def section(self, name, strict=None):
+    def section(self, name: str, strict: bool | None=None) -> Section:
         """Returns the `Section` object for *name*.
 
         *strict* can be used to override the *strict* setting for this section.
         """
         return self._sections.setdefault(name, Section(self, name, strict))
 
-    def sections(self):
+    def sections(self) -> ValuesView[Section]:
         """Returns all `Section` objects."""
         return self._sections.values()
 
-    def clear(self):
+    def clear(self) -> None:
         """Deletes all `Section` objects and their options."""
         self._sections.clear()
 
-    def todict(self, encode=False):
+    def todict(self, encode: bool=False) -> dict[str, dict[str, Any]]:
         """Returns a dict of `{'section_name': {'option': <value>}}`.
 
         If *encode* is `True`, the *value* will be a string.
         """
-        return {sct.name: dict(sct.items(encode)) for sct in self}
+        method = 'encoded_items' if encode else 'items'
+        return {sct.name: dict(getattr(sct, method)()) for sct in self}
 
     ## special methods ##
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         section, option = self._split_key(key)
         return self._sections[section][option]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         section, option = self._split_key(key)
         self._sections[section][option] = value
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[Section, None, None]:
         yield from self.sections()
 
-    def __len__(self):
-        return len(self._sections())
+    def __len__(self) -> int:
+        return len(self._sections)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '{}({})'.format(self.__class__.__name__, self.todict())
 
     ## types ##
 
-    def register_type(self, type, encode, decode):
+    def register_type(self, type: Any,
+        encode: EncodeFunction, decode: DecodeFunction
+        ) -> None:
         self._codec.register_type(type, encode, decode)
 
-    def unregister_type(self, type):
+    def unregister_type(self, type: Any) -> None:
         self._codec.unregister_type(type)
 
-    def unregister_all_types(self):
+    def unregister_all_types(self) -> None:
         self._codec.unregister_all_types()
 
     ## persistence ##
 
-    def read(self, *sources):
+    def read(self, *sources: str | TextIO) -> None:
         for source in sources or self._sources:
             try:
                 if isinstance(source, str):
@@ -134,7 +143,7 @@ class Config:
             except OSError as e:
                 log.warning('failed to open source: %s:\n  %s', source, e)
 
-    def write(self, source=None):
+    def write(self, source: str | TextIO | None=None) -> None:
         source = source or self._sources[0]
         if isinstance(source, str):
             with open(source, 'w') as f:
@@ -142,97 +151,95 @@ class Config:
         else:
             self._format.write(source, self)
 
-    def _split_key(self, key):
+    def _split_key(self, key: str) -> list[str]:
         return key.split(self._delimiter, 1)
 
-class Section(collections.abc.MutableMapping):
-    def __init__(self, config, name, strict=None):
+class Section(collections.abc.MutableMapping[str, Any]):
+    def __init__(self, config: Config, name: str, strict: bool | None=None):
         self._config = config
         self._name = name
 
         self._strict = strict
-        self._schema = {}
-        self._values = {}
+        self._schema: dict[str, _OptionInfo] = {}
+        self._values: dict[str, Any] = {}
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
-    def strict(self):
+    def strict(self) -> bool:
         return self._config.strict if self._strict is None else self._strict
 
     @strict.setter
-    def strict(self, strict):
+    def strict(self, strict: bool) -> None:
         self._strict = strict
 
-    def define(self, name, default, type=None):
+    def define(self, name: str, default: Any, type: Any=None) -> None:
         type = self._config._codec.typename(type or _type(default))
-        self._schema[name] = _Definition(default, type)
+        self._schema[name] = _OptionInfo(default, type)
         self._values[name] = default
 
-    def get(self, name, default=None, encode=False):
+    def get(self, name: str, default: Any=None, encode: bool=False) -> Any:
         self._strict_check(name)
         value = self._values.get(name, default)
         if encode:
             value = self._encode(name, value)
         return value
 
-    def set(self, name, value, decode=False):
+    def set(self, name: str, value: Any, decode: bool=False) -> None:
         self._strict_check(name)
         if decode:
             value = self._decode(name, value)
         self._values[name] = value
 
-    def getdefault(self, name):
+    def getdefault(self, name: str) -> Any:
         """Returns the default value for *name*."""
         return self._schema[name].default
 
-    def items(self, encode=False):
-        items = super().items()
-        if not encode:
-            return items
-        return [(name, self._encode(name, value)) for name, value in items]
+    def encoded_items(self) -> Generator[tuple[str, Any], None, None]:
+        return ((name, self._encode(name, value))
+            for name, value in self.items())
 
-    def clear(self):
+    def clear(self) -> None:
         self._schema.clear()
         self._values.clear()
 
     ## special methods ##
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: str) -> Any:
         self._strict_check(name)
         return self._values[name]
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, name: str, value: Any) -> None:
         self._strict_check(name)
         self._values[name] = value
 
-    def __delitem__(self, name):
+    def __delitem__(self, name: str) -> None:
         self._strict_check(name)
         del self._schema[name]
         del self._values[name]
 
-    def __iter__(self):
-        return iter(self._values)
+    def __iter__(self) -> Generator[str, None, None]:
+        return (key for key in self._values)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._values)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '{}({})'.format(self.__class__.__name__, self._values)
 
     ## internal ##
 
-    def _encode(self, name, value):
-        type = self._schema.get(name, _Definition(None, None)).type
+    def _encode(self, name: str, value: Any) -> str:
+        type = self._schema.get(name, _OptionInfo()).type
         return self._config._codec.encode(value, type)
 
-    def _decode(self, name, value):
-        type = self._schema.get(name, _Definition(None, None)).type
+    def _decode(self, name: str, value: str) -> Any:
+        type = self._schema.get(name, _OptionInfo()).type
         return self._config._codec.decode(value, type)
 
-    def _strict_check(self, name):
+    def _strict_check(self, name: str) -> None:
         if self.strict and name not in self._schema:
             raise UnknownOption(name)
 
@@ -241,10 +248,10 @@ class Section(collections.abc.MutableMapping):
 ##
 
 class Format:
-    def read(self, file, config):
+    def read(self, file: TextIO, config: Config) -> None:
         raise NotImplementedError('abstract')
 
-    def write(self, file, config):
+    def write(self, file: TextIO, config: Config) -> None:
         raise NotImplementedError('abstract')
 
 class INIFormat(Format):
@@ -253,10 +260,10 @@ class INIFormat(Format):
     *parser* can be used to pass in a custom `configparser.ConfigParser`
         instance. The default instance disables interpolation.
     """
-    def __init__(self, parser=None):
-        self._parser = parser or configparser.ConfigParser(interpolation=None)
+    def __init__(self, parser: ConfigParser | None=None):
+        self._parser = parser or ConfigParser(interpolation=None)
 
-    def read(self, file, config):
+    def read(self, file: TextIO, config: Config) -> None:
         parser = self._parser
 
         parser.read_file(file)
@@ -275,19 +282,19 @@ class INIFormat(Format):
 
         self._clear()
 
-    def write(self, file, config):
+    def write(self, file: TextIO, config: Config) -> None:
         parser = self._parser
 
         for sct in config:
             parser.add_section(sct.name)
-            for name, value in sct.items(encode=True):
+            for name, value in sct.encoded_items():
                 parser[sct.name][name] = value
 
         parser.write(file)
 
         self._clear()
 
-    def _clear(self):
+    def _clear(self) -> None:
         parser = self._parser
         for sct in parser.sections():
             parser.remove_section(sct)
@@ -297,42 +304,46 @@ class INIFormat(Format):
 ##
 
 class Codec:
-    def __init__(self):
-        self._types = {}
+    def __init__(self) -> None:
+        self._types: dict[str, _CodecInfo] = {}
         self.register_default_types()
 
-    def encode(self, value, type):
+    def encode(self, value: Any, type: Any) -> str:
         type = self.typename(type)
-        return self._types.get(type, _CodecNop).encode(value)
+        info = self._types.get(type, _CodecInfo())
+        return info.encode(value) if info.encode else str(value)
 
-    def decode(self, value, type):
+    def decode(self, value: str, type: Any) -> Any:
         type = self.typename(type)
-        return self._types.get(type, _CodecNop).decode(value)
+        info = self._types.get(type, _CodecInfo())
+        return info.decode(value) if info.decode else value
 
-    def register_default_types(self):
+    def register_default_types(self) -> None:
         pass
 
     ## types ##
 
-    def typename(self, type):
+    def typename(self, type: Any) -> str:
         return str(type)
 
-    def register_type(self, type, encode, decode):
+    def register_type(self, type: Any,
+        encode: EncodeFunction | None, decode: DecodeFunction | None,
+        ) -> None:
         typename = self.typename(type)
-        self._types[typename] = _CodecType(
-            encode or (lambda v: v),
+        self._types[typename] = _CodecInfo(
+            encode or (lambda v: str(v)),
             decode or (lambda v: v),
             )
 
-    def unregister_type(self, type):
+    def unregister_type(self, type: Any) -> None:
         typename = self.typename(type)
         del self._types[typename]
 
-    def unregister_all_types(self):
+    def unregister_all_types(self) -> None:
         self._types.clear()
 
 class StringCodec(Codec):
-    def register_default_types(self):
+    def register_default_types(self) -> None:
         self.register_type(str, None, None)
         self.register_type(int, str, int)
         self.register_type(float, str, float)
@@ -343,7 +354,7 @@ class StringCodec(Codec):
             lambda x: 'true' if x else 'false',
             lambda x: _boolean_states[x.lower()])
 
-        def clean_split(v):
+        def clean_split(v: str) -> Generator[str, None, None]:
             yield from filter(None, (x.strip() for x in v.split(',')))
 
         self.register_type('set[str]',
@@ -374,6 +385,13 @@ class UnknownOption(ConfigError):
 ## internal
 ##
 
-_Definition = collections.namedtuple('_Definition', 'default type')
-_CodecType = collections.namedtuple('_CodecType', 'encode decode')
-_CodecNop = _CodecType(lambda v: v, lambda v: v)
+class _OptionInfo(NamedTuple):
+    default: Any | None = None
+    type: str | None = None
+
+class _CodecInfo(NamedTuple):
+    encode: EncodeFunction | None = None
+    decode: DecodeFunction | None = None
+
+EncodeFunction = Callable[[Any], str]
+DecodeFunction = Callable[[str], Any]
