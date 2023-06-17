@@ -1,4 +1,6 @@
+import io
 import unittest
+from typing import List, Set, Tuple
 
 import snekcfg
 
@@ -57,6 +59,46 @@ class TestConfig(unittest.TestCase):
 
         self.assertEqual(sct.get('int'), 3)
         self.assertEqual(sct.get('int', encode=True), '3')
+
+    def test_write(self) -> None:
+        cfg = snekcfg.Config()
+        cfg.define('a.int', 1)
+
+        s = io.StringIO()
+        cfg.write(s)
+
+        self.assertEqual(s.getvalue(), "[a]\nint = 1\n\n")
+
+    def test_set_type(self) -> None:
+        cfg = snekcfg.Config()
+        sct = cfg.section('test')
+        sct.define('value', {}, Set[str])
+
+        s = io.StringIO('[test]\nvalue =   a,b  , c, d   ')
+        cfg.read(s)
+
+        self.assertEqual(sct['value'], set('abcd'))
+
+    def test_list_type(self) -> None:
+        cfg = snekcfg.Config()
+        sct = cfg.section('test')
+        sct.define('value', [], List[str])
+
+        s = io.StringIO('[test]\nvalue =   a,b  , c, d   ')
+        cfg.read(s)
+
+        self.assertEqual(sct['value'], list('abcd'))
+
+    def test_tuple_type(self) -> None:
+        cfg = snekcfg.Config()
+        sct = cfg.section('test')
+        sct.define('value', (), Tuple[str, ...])
+
+        s = io.StringIO('[test]\nvalue =   a,b  , c, d   ')
+        cfg.read(s)
+
+        self.assertEqual(sct['value'], tuple('abcd'))
+
 
 if __name__ == '__main__':
     unittest.main()

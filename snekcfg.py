@@ -4,13 +4,11 @@
 Snek-charming incantations follow ...
 """
 
-from __future__ import annotations
-
 import logging
-import collections
 from configparser import ConfigParser
 
-from typing import Any, Callable, Generator, NamedTuple, TextIO, ValuesView
+from typing import (Any, Callable, Dict, Generator, List, MutableMapping,
+                    NamedTuple, Optional, Set, TextIO, Tuple, Union, ValuesView)
 
 __author__  = 'Miguel Turner'
 __version__ = '0.1.1'
@@ -24,8 +22,8 @@ log = logging.getLogger(__name__)
 class Config:
     """The main configuration object."""
 
-    def __init__(self, *sources: str | TextIO, format: Format | None=None,
-        codec: Codec | None=None, strict: bool=True, delimiter: str='.'
+    def __init__(self, *sources: Union[str, TextIO], format: Optional["Format"]=None,
+            codec: Optional["Codec"]=None, strict: bool=True, delimiter: str='.'
         ):
         """Creates a `Config` object.
 
@@ -53,7 +51,7 @@ class Config:
 
         self.strict = strict
 
-        self._sections: dict[str, Section] = {}
+        self._sections: Dict[str, Section] = {}
 
     def define(self, key: str, default: Any, type: Any=None) -> None:
         """Defines a new option.
@@ -78,14 +76,14 @@ class Config:
         except KeyError:
             return default
 
-    def section(self, name: str, strict: bool | None=None) -> Section:
+    def section(self, name: str, strict: Optional[bool]=None) -> "Section":
         """Returns the `Section` object for *name*.
 
         *strict* can be used to override the *strict* setting for this section.
         """
         return self._sections.setdefault(name, Section(self, name, strict))
 
-    def sections(self) -> ValuesView[Section]:
+    def sections(self) -> ValuesView["Section"]:
         """Returns all `Section` objects."""
         return self._sections.values()
 
@@ -93,7 +91,7 @@ class Config:
         """Deletes all `Section` objects and their options."""
         self._sections.clear()
 
-    def todict(self, encode: bool=False) -> dict[str, dict[str, Any]]:
+    def todict(self, encode: bool=False) -> Dict[str, Dict[str, Any]]:
         """Returns a dict of `{'section_name': {'option': <value>}}`.
 
         If *encode* is `True`, the *value* will be a string.
@@ -111,7 +109,7 @@ class Config:
         section, option = self._split_key(key)
         self._sections[section][option] = value
 
-    def __iter__(self) -> Generator[Section, None, None]:
+    def __iter__(self) -> Generator["Section", None, None]:
         yield from self.sections()
 
     def __len__(self) -> int:
@@ -123,7 +121,7 @@ class Config:
     ## types ##
 
     def register_type(self, type: Any,
-        encode: EncodeFunction, decode: DecodeFunction
+        encode: "EncodeFunction", decode: "DecodeFunction"
         ) -> None:
         self._codec.register_type(type, encode, decode)
 
@@ -135,7 +133,7 @@ class Config:
 
     ## persistence ##
 
-    def read(self, *sources: str | TextIO) -> None:
+    def read(self, *sources: Union[str, TextIO]) -> None:
         for source in sources or self._sources:
             try:
                 if isinstance(source, str):
@@ -146,7 +144,7 @@ class Config:
             except OSError as e:
                 log.warning('failed to open source: %s:\n  %s', source, e)
 
-    def write(self, source: str | TextIO | None=None) -> None:
+    def write(self, source: Union[str, TextIO, None]=None) -> None:
         source = source or self._sources[0]
         if isinstance(source, str):
             with open(source, 'w') as f:
@@ -154,17 +152,17 @@ class Config:
         else:
             self._format.write(source, self)
 
-    def _split_key(self, key: str) -> list[str]:
+    def _split_key(self, key: str) -> List[str]:
         return key.split(self._delimiter, 1)
 
-class Section(collections.abc.MutableMapping[str, Any]):
-    def __init__(self, config: Config, name: str, strict: bool | None=None):
+class Section(MutableMapping[str, Any]):
+    def __init__(self, config: Config, name: str, strict: Optional[bool]=None):
         self._config = config
         self._name = name
 
         self._strict = strict
-        self._schema: dict[str, _OptionInfo] = {}
-        self._values: dict[str, Any] = {}
+        self._schema: Dict[str, _OptionInfo] = {}
+        self._values: Dict[str, Any] = {}
 
     @property
     def name(self) -> str:
@@ -200,7 +198,7 @@ class Section(collections.abc.MutableMapping[str, Any]):
         """Returns the default value for *name*."""
         return self._schema[name].default
 
-    def encoded_items(self) -> Generator[tuple[str, Any], None, None]:
+    def encoded_items(self) -> Generator[Tuple[str, Any], None, None]:
         return ((name, self._encode(name, value))
             for name, value in self.items())
 
@@ -263,7 +261,7 @@ class INIFormat(Format):
     *parser* can be used to pass in a custom `configparser.ConfigParser`
         instance. The default instance disables interpolation.
     """
-    def __init__(self, parser: ConfigParser | None=None):
+    def __init__(self, parser: Optional[ConfigParser]=None):
         self._parser = parser or ConfigParser(interpolation=None)
 
     def read(self, file: TextIO, config: Config) -> None:
@@ -308,7 +306,7 @@ class INIFormat(Format):
 
 class Codec:
     def __init__(self) -> None:
-        self._types: dict[str, _CodecInfo] = {}
+        self._types: Dict[str, _CodecInfo] = {}
         self.register_default_types()
 
     def encode(self, value: Any, type: Any) -> str:
@@ -330,7 +328,7 @@ class Codec:
         return str(type)
 
     def register_type(self, type: Any,
-        encode: EncodeFunction | None, decode: DecodeFunction | None,
+        encode: Optional["EncodeFunction"], decode: Optional["DecodeFunction"],
         ) -> None:
         typename = self.typename(type)
         self._types[typename] = _CodecInfo(
@@ -360,17 +358,17 @@ class StringCodec(Codec):
         def clean_split(v: str) -> Generator[str, None, None]:
             yield from filter(None, (x.strip() for x in v.split(',')))
 
-        self.register_type('set[str]',
+        self.register_type(Set[str],
             lambda v: ','.join(v),
             lambda v: set(clean_split(v)))
-        self.register_type('list[str]',
+        self.register_type(List[str],
             lambda v: ','.join(v),
             lambda v: list(clean_split(v)))
-        self.register_type('tuple[str, ...]',
+        self.register_type(Tuple[str, ...],
             lambda v: ','.join(v),
             lambda v: tuple(clean_split(v)))
 
-        self.register_type('tuple[int, ...]',
+        self.register_type(Tuple[int, ...],
             lambda v: ','.join(str(x) for x in v),
             lambda v: tuple(int(x) for x in clean_split(v)))
 
@@ -391,13 +389,13 @@ class InvalidKey(ConfigError):
 ## internal
 ##
 
-class _OptionInfo(NamedTuple):
-    default: Any | None = None
-    type: str | None = None
-
-class _CodecInfo(NamedTuple):
-    encode: EncodeFunction | None = None
-    decode: DecodeFunction | None = None
-
 EncodeFunction = Callable[[Any], str]
 DecodeFunction = Callable[[str], Any]
+
+class _OptionInfo(NamedTuple):
+    default: Any = None
+    type: Optional[str] = None
+
+class _CodecInfo(NamedTuple):
+    encode: Optional[EncodeFunction] = None
+    decode: Optional[DecodeFunction] = None
